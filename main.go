@@ -30,10 +30,13 @@ func setupSignalHandler() (stopCh <-chan struct{}) {
 
 	stop := make(chan struct{})
 	c := make(chan os.Signal, 2)
+	// 确定需要捕获的信号
 	signal.Notify(c, shutdownSignals...)
 	go func() {
+		// os.Interrupt
 		<-c
 		close(stop)
+		// syscal.SIGTERM
 		<-c
 		os.Exit(1)
 	}()
@@ -44,6 +47,7 @@ func setupSignalHandler() (stopCh <-chan struct{}) {
 func main() {
 	flag.Parse()
 
+	// 设置一个信号处理，用于优雅关闭，这个模式大多数程序都能这样写
 	stopCh := setupSignalHandler()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
@@ -61,6 +65,8 @@ func main() {
 		glog.Fatalf("Error building example clientset: %s", err.Error())
 	}
 
+	// informerFactory 工厂类，这里注入代码生成的 client
+	// client 主要用于与 API Server 进行通信，实现 ListAndWatch
 	mydemoInformerFactory := informers.NewSharedInformerFactory(mydemoClient, time.Second*30)
 
 	controller := NewController(kubeClient, mydemoClient,
