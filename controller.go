@@ -37,7 +37,7 @@ type Controller struct {
 	kubeclientset   kubernetes.Interface
 	mydemoslientset clientset.Interface
 
-	demoInformer  listers.MydemoLister
+	demoLister    listers.MydemoLister
 	mydemosSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
@@ -54,7 +54,7 @@ type Controller struct {
 // NewController returns a new mydemo controller
 func NewController(
 	kubeclientset kubernetes.Interface,
-	mydemoslientset clientset.Interface,
+	mydemoclientset clientset.Interface,
 	mydemoInformer informers.MydemoInformer) *Controller {
 
 	// Create event broadcaster
@@ -62,15 +62,20 @@ func NewController(
 	// logged for sample-controller types.
 	utilruntime.Must(mydemoscheme.AddToScheme(scheme.Scheme))
 	glog.V(4).Info("Creating event broadcaster")
+	// Package record has all client logic for recording and reporting
+	// "k8s.io/api/core/v1".Event events.
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
+	// EventSink knows how to store events.
+	// EventSink must respect the namespace that will be embedded in 'event'.
+	// 将事件上报至 api server 并存储支 etcd 中
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 
 	controller := &Controller{
 		kubeclientset:   kubeclientset,
-		mydemoslientset: mydemoslientset,
-		demoInformer:    mydemoInformer.Lister(),
+		mydemoslientset: mydemoclientset,
+		demoLister:      mydemoInformer.Lister(),
 		mydemosSynced:   mydemoInformer.Informer().HasSynced,
 		workqueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Mydemos"),
 		recorder:        recorder,
@@ -195,7 +200,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// Get the Mydemo resource with this namespace/name
-	mydemo, err := c.demoInformer.Mydemos(namespace).Get(name)
+	mydemo, err := c.demoLister.Mydemos(namespace).Get(name)
 	if err != nil {
 		// The Mydemo resource may no longer exist, in which case we stop
 		// processing.
