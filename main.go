@@ -69,6 +69,7 @@ func main() {
 	// client 主要用于与 API Server 进行通信，实现 ListAndWatch
 	mydemoInformerFactory := informers.NewSharedInformerFactory(mydemoClient, time.Second*30)
 
+	// 生成一个 crddemo group 的 Mydemo 对象传递给自定义控制器
 	controller := NewController(kubeClient, mydemoClient,
 		mydemoInformerFactory.Crddemo().V1().Mydemos())
 
